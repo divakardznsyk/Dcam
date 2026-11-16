@@ -6,19 +6,35 @@ plugins {
 
 android {
     namespace = "com.dcam.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.dcam.app"
         minSdk = 29
-        targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.0.0"
+    }
+
+    // A fixed key is committed on purpose so every build is signed the same way
+    // and new APKs install as updates over old ones. Fine for a personal app;
+    // replace with a private key before publishing to the Play Store.
+    signingConfigs {
+        create("dcam") {
+            storeFile = file("dcam-release.jks")
+            storePassword = "dcam1234"
+            keyAlias = "dcam"
+            keyPassword = "dcam1234"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("dcam")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("dcam")
         }
     }
 
@@ -37,15 +53,15 @@ android {
 }
 
 dependencies {
-    val cameraX = "1.3.4"
+    val cameraX = "1.5.1"
 
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.activity:activity-compose:1.9.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")

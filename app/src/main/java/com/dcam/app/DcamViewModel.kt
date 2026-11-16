@@ -1,7 +1,9 @@
 package com.dcam.app
 
 import android.app.Application
+import android.content.Context
 import android.graphics.Bitmap
+import android.media.MediaActionSound
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
@@ -10,48 +12,93 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.dcam.app.camera.BitmapUtil
 import com.dcam.app.camera.CameraEngine
 import com.dcam.app.camera.ImageSaver
 import com.dcam.app.filters.BuiltInLooks
 import com.dcam.app.filters.CubeLut
+import com.dcam.app.filters.DateStyle
+import com.dcam.app.filters.FlashMode
+import com.dcam.app.filters.FrameStyle
+import com.dcam.app.filters.GrainLevel
+import com.dcam.app.filters.LeakStyle
 import com.dcam.app.filters.Look
 import com.dcam.app.filters.LookProcessor
+import com.dcam.app.filters.Ratio
+import com.dcam.app.filters.RenderOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import java.io.File
+import java.util.Date
+
+enum class PanelTab { LOOK, FX, SHOOT }
 
 class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
-    val looks = mutableStateListOf<Look>().apply { addAll(BuiltInLooks.all) }
-    var selectedLook by mutableStateOf(looks[1])
+    private val prefs = app.getSharedPreferences("dcam", Context.MODE_PRIVATE)
+    private val sound = MediaActionSound().apply { load(MediaActionSound.SHUTTER_CLICK) }
 
+    // ---- Look + effects
+    val looks = mutableStateListOf<Look>().apply { addAll(BuiltInLooks.all) }
+    var selectedLook by mutableStateOf(looks.first { it.id == "gold200" })
+    var dateStyle by mutableStateOf(DateStyle.OFF)
+    var leak by mutableStateOf(LeakStyle.OFF)
+    var dust by mutableStateOf(false)
+    var grain by mutableStateOf(GrainLevel.MED)
+    var frame by mutableStateOf(FrameStyle.NONE)
+
+    // ---- Camera controls
     var panelOpen by mutableStateOf(true)
+    var panelTab by mutableStateOf(PanelTab.LOOK)
     var frontCamera by mutableStateOf(false)
     var zoom by mutableStateOf(1f)
+    var flash by mutableStateOf(FlashMode.OFF)
+    var timerSeconds by mutableStateOf(0)
+    var ratio by mutableStateOf(Ratio.R34)
+    var exposureEv by mutableStateOf(0f)
 
-    // Burst
+    // ---- Burst
     var burstOn by mutableStateOf(false)
         private set
     var burstCount by mutableStateOf(5)
     var burstIntervalMs by mutableStateOf(300)
 
-    // Double exposure
+    // ---- Double exposure
     var doubleExposure by mutableStateOf(false)
         private set
     var hasPendingFirst by mutableStateOf(false)
         private set
     private var pendingFirst: Bitmap? = null
 
-    // Shooting state
+    // ---- Saved settings
+    var rawPlusJpeg by mutableStateOf(prefs.getBoolean("raw", false))
+        private set
+    var saveOriginal by mutableStateOf(prefs.getBoolean("original", false))
+        private set
+    var shutterSound by mutableStateOf(prefs.getBoolean("sound", true))
+        private set
+    var mirrorSelfie by mutableStateOf(prefs.getBoolean("mirror", true))
+        private set
+    var gridOn by mutableStateOf(prefs.getBoolean("grid", false))
+        private set
+
+    // ---- Shooting state
     var busy by mutableStateOf(false)
         private set
     var progress by mutableStateOf(0)
         private set
     var total by mutableStateOf(1)
         private set
+    var countdown by mutableStateOf(0)
+        private set
     var message by mutableStateOf<String?>(null)
+
+    var lastThumb by mutableStateOf<Bitmap?>(null)
+        private set
+    var lastUri by mutableStateOf<Uri?>(null)
+        private set
 
     // Limits how many full-size photos wait for processing, so a long burst can't run out of memory.
     private val processingGate = Semaphore(2)
@@ -60,12 +107,20 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
         loadSavedLuts()
     }
 
-    fun setBurst(on: Boolean) {
+    // ------------------------------------------------------------ settings
+
+    fun updateRaw(on: Boolean) { rawPlusJpeg = on; prefs.edit().putBoolean("raw", on).apply() }
+    fun updateSaveOriginal(on: Boolean) { saveOriginal = on; prefs.edit().putBoolean("original", on).apply() }
+    fun updateShutterSound(on: Boolean) { shutterSound = on; prefs.edit().putBoolean("sound", on).apply() }
+    fun updateMirrorSelfie(on: Boolean) { mirrorSelfie = on; prefs.edit().putBoolean("mirror", on).apply() }
+    fun updateGrid(on: Boolean) { gridOn = on; prefs.edit().putBoolean("grid", on).apply() }
+
+    fun updateBurst(on: Boolean) {
         burstOn = on
-        if (on) setDoubleExposure(false)
+        if (on) updateDoubleExposure(false)
     }
 
-    fun setDoubleExposure(on: Boolean) {
+    fun updateDoubleExposure(on: Boolean) {
         doubleExposure = on
         if (on) burstOn = false
         if (!on) {
@@ -73,6 +128,19 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
             hasPendingFirst = false
         }
     }
+
+    // ------------------------------------------------------------ shooting
+
+    private fun currentOptions(date: Date = Date(), crop: Boolean = true) = RenderOptions(
+        look = selectedLook,
+        grainScale = grain.scale,
+        dateStyle = dateStyle,
+        leak = leak,
+        dust = dust,
+        frame = frame,
+        ratio = if (crop) ratio else null,
+        date = date,
+    )
 
     fun shoot(engine: CameraEngine) {
         if (busy) return
@@ -82,12 +150,21 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
         viewModelScope.launch {
             try {
+                if (timerSeconds > 0) {
+                    for (t in timerSeconds downTo 1) {
+                        countdown = t
+                        delay(1000)
+                    }
+                    countdown = 0
+                }
+
                 for (i in 1..shots) {
                     progress = i
-                    val raw = engine.capture()
-                    val look = selectedLook
+                    if (shutterSound) sound.play(MediaActionSound.SHUTTER_CLICK)
+                    val raw = engine.capture(mirrorSelfie)
+                    val opts = currentOptions()
 
-                    val toSave: Bitmap? = if (doubleExposure) {
+                    val toProcess: Bitmap? = if (doubleExposure) {
                         val first = pendingFirst
                         if (first == null) {
                             pendingFirst = raw
@@ -101,12 +178,11 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     } else raw
 
-                    if (toSave != null) {
+                    if (toProcess != null) {
                         processingGate.acquire()
                         viewModelScope.launch(Dispatchers.Default) {
                             try {
-                                val result = LookProcessor.apply(toSave, look)
-                                ImageSaver.save(getApplication(), result)
+                                processAndSave(toProcess, opts)
                             } catch (e: Exception) {
                                 message = "Save failed: ${e.message}"
                             } finally {
@@ -117,16 +193,52 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
                     if (i < shots) delay(burstIntervalMs.toLong())
                 }
                 if (!(doubleExposure && hasPendingFirst)) {
-                    message = if (shots > 1) "Saving $shots photos to Pictures/Dcam" else "Saved to Pictures/Dcam"
+                    message = when {
+                        shots > 1 -> "Saving $shots photos to Pictures/Dcam"
+                        rawPlusJpeg -> "Saved JPEG + RAW to Pictures/Dcam"
+                        else -> "Saved to Pictures/Dcam"
+                    }
                 }
             } catch (e: Exception) {
                 message = "Capture failed: ${e.message}"
             } finally {
                 busy = false
                 progress = 0
+                countdown = 0
             }
         }
     }
+
+    private fun processAndSave(source: Bitmap, opts: RenderOptions) {
+        val context = getApplication<Application>()
+        // Save the untouched photo first: the render step may work on the same bitmap.
+        if (saveOriginal) ImageSaver.save(context, source, prefix = "DCAM_ORIG")
+        val result = LookProcessor.render(source, opts)
+        val uri = ImageSaver.save(context, result)
+        lastThumb = ImageSaver.thumbnail(result)
+        lastUri = uri
+    }
+
+    /** Applies the current look and effects to a photo picked from the gallery. */
+    fun editImage(uri: Uri) {
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                message = "Developing..."
+                val source = BitmapUtil.fromUri(getApplication<Application>().contentResolver, uri)
+                processingGate.acquire()
+                try {
+                    processAndSave(source, currentOptions(crop = false))
+                } finally {
+                    processingGate.release()
+                }
+                message = "Saved to Pictures/Dcam"
+            } catch (e: Exception) {
+                message = "Could not edit photo: ${e.message}"
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- LUTs
 
     /** Imports a .cube LUT chosen by the user and adds it as a new look. */
     fun importLut(uri: Uri) {
@@ -171,9 +283,14 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun lutLook(lut: CubeLut) = Look(
         id = "lut:${lut.name}",
-        name = lut.name.uppercase().take(10),
+        name = lut.name.uppercase().take(12),
         grain = 0.12f,
         vignette = 0.12f,
         lut = lut,
     )
+
+    override fun onCleared() {
+        sound.release()
+        super.onCleared()
+    }
 }

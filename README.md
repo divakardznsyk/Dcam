@@ -1,45 +1,71 @@
 # Dcam
 
-A simple retro camera app for Android. Dark UI, yellow accents, one big **zap** button.
+A retro camera app for Android. Dark UI, yellow accents, one big **zap** button.
 
-## Features
+## Download
 
-- **Retro looks** built in: ZERO (none), GOLD, SOFT, NOIR, INSTANT, DISPO, TUNGSTEN, FADE.
-  Each look combines colour grading, faded blacks, film grain and vignette. These are original approximations inspired by classic film stocks and cameras, not official presets.
-- **Import your own looks**: tap `+ LUT` in the LOOK row and pick a 3D `.cube` file. It is saved inside the app and appears in the list next time.
-- **Burst mode**: turn BURST on, then pick how many photos (2 to 30) and the gap between them (100 to 1000 ms). One tap on zap takes them all.
-- **Double exposure**: take two shots, they are screen-blended into one picture.
-- 1x / 2x zoom, front/back camera flip, live tinted preview.
-- Photos are saved to `Pictures/Dcam`.
+Latest APK (always the newest build from `main`):
 
-## Get the APK (no Android Studio needed)
+**https://github.com/divakardznsyk/Dcam/releases/download/latest/Dcam.apk**
 
-Every push to `main` runs the **Build APK** GitHub Action. Open the Actions tab, pick the latest run, and download `dcam-debug-apk`. Unzip it and install `app-debug.apk` on your phone (allow installs from unknown sources).
+Open it on your phone and install (allow "install unknown apps" when asked). New builds install as updates over old ones.
 
-## Build locally
+## Features (V1)
 
-Open the folder in Android Studio (Koala or newer, JDK 17) and run the `app` configuration. Or with Gradle 8.9+ installed: `gradle assembleDebug`.
+**Looks** (tap the look name at the top to show or hide the control panel)
+- 20 built-in looks: GOLD 200, PORTRA 400, SUPERIA 400, EKTAR 100, VELVIA 50, TRI-X 400, HP5 400, CINE 800T, TEAL ORANGE, MIDNIGHT, POLA 600, SX FADE, DISPO 27, DISPO GREEN, FLASH, CCD 2003, DIGI 99, SUNSET, SEPIA, FADE (plus ZERO for no filter)
+- Import your own 3D `.cube` LUTs with `+ LUT`
+- Live tinted preview
+
+**FX tab**
+- Date stamp (orange or white, retro `'26 11 16` style)
+- Light leaks: WARM, SUN, RED, COOL
+- Dust and scratches
+- Grain level: OFF / LOW / MED / HIGH
+- Frames: POLAROID, FILM strip, BLACK, WHITE
+- Double exposure
+
+**SHOOT tab**
+- Ratio 4:3 / 1:1 / 16:9
+- Flash OFF / AUTO / ON
+- Timer 3s / 10s
+- Grid, exposure compensation
+- **Burst**: choose 2 to 30 photos and the gap between them (100 to 1000 ms)
+
+**Everything else**
+- Tap to focus, pinch to zoom, 1x / 2x / 3x, front/back flip
+- **EDIT**: pick a photo from your gallery and apply the current look and effects
+- Last-photo thumbnail opens in your gallery
+- Settings: **RAW + JPEG** (saves a `.dng` with every photo, if the phone supports it), save the untouched original too, shutter sound, mirror selfies, grid
+
+Photos are saved to `Pictures/Dcam`.
+
+Look names are close to real film stocks and cameras but they are original approximations, not official presets. Rename them before any Play Store release.
+
+## Build
+
+Every push to `main` runs the **Build APK** GitHub Action, which builds a signed release APK and updates the download link above.
+
+Locally: open in Android Studio (JDK 17), or with Gradle 8.11+ run `gradle assembleRelease`.
+
+The signing key `app/dcam-release.jks` is committed on purpose so updates install cleanly. Replace it with a private key before publishing to the Play Store.
 
 ## Project layout
 
 ```
 app/src/main/java/com/dcam/app/
-  MainActivity.kt        entry point
-  DcamScreen.kt          Compose UI (preview, panel, zap button)
-  DcamViewModel.kt       app state, burst loop, double exposure, LUT import
-  camera/CameraEngine.kt CameraX preview, zoom, flip, capture
-  camera/ImageSaver.kt   saves JPEGs to the gallery
-  filters/Look.kt        the Look model and the built-in looks
-  filters/LookProcessor.kt  applies a look (colour, grain, vignette, LUT)
-  filters/CubeLut.kt     .cube parser with trilinear sampling
+  MainActivity.kt           entry point
+  DcamScreen.kt             Compose UI (preview, panel tabs, settings, zap)
+  DcamViewModel.kt          state, burst loop, timer, double exposure, LUT import, edit
+  camera/CameraEngine.kt    CameraX preview, zoom, focus, flash, exposure, RAW+JPEG capture
+  camera/BitmapUtil.kt      memory-safe photo decoding
+  camera/ImageSaver.kt      saves JPEGs to the gallery
+  filters/Look.kt           looks (add new ones in BuiltInLooks)
+  filters/Effects.kt        effect options
+  filters/LookProcessor.kt  render pipeline: crop, look, leak, dust, date, frame
+  filters/CubeLut.kt        .cube parser
 ```
 
-## Add a new built-in look
+## Ideas for V2
 
-Add a line to `BuiltInLooks.all` in `filters/Look.kt`. Tweak `saturation`, `contrast`, `r/g/b` gains, `fade`, `grain` and `vignette`.
-
-## Not done yet
-
-- RAW capture (needs Camera2 DNG support)
-- Live preview for LUT looks (they preview unfiltered, the saved photo is correct)
-- App icon
+Video with looks, live preview for LUT looks, more frames and light leaks, app icon, in-app gallery.

@@ -15,9 +15,9 @@ object ImageSaver {
     private val counter = AtomicInteger(0)
 
     /** Saves [bitmap] as a JPEG in Pictures/Dcam and returns its Uri. */
-    fun save(context: Context, bitmap: Bitmap): Uri {
+    fun save(context: Context, bitmap: Bitmap, prefix: String = "DCAM", quality: Int = 95): Uri {
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val name = "DCAM_${stamp}_${counter.incrementAndGet()}.jpg"
+        val name = "${prefix}_${stamp}_${counter.incrementAndGet()}.jpg"
 
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, name)
@@ -30,12 +30,21 @@ object ImageSaver {
         val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
             ?: error("Could not create MediaStore entry")
 
-        resolver.openOutputStream(uri)?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+        resolver.openOutputStream(uri)?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it) }
             ?: error("Could not open output stream")
 
         values.clear()
         values.put(MediaStore.Images.Media.IS_PENDING, 0)
         resolver.update(uri, values, null, null)
         return uri
+    }
+
+    /** Small square thumbnail for the gallery button. */
+    fun thumbnail(src: Bitmap, size: Int = 160): Bitmap {
+        val side = minOf(src.width, src.height)
+        val x = (src.width - side) / 2
+        val y = (src.height - side) / 2
+        val square = Bitmap.createBitmap(src, x, y, side, side)
+        return Bitmap.createScaledBitmap(square, size, size, true)
     }
 }
