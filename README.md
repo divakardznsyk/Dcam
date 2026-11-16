@@ -10,37 +10,18 @@ Latest APK (always the newest build from `main`):
 
 Open it on your phone and install (allow "install unknown apps" when asked). New builds install as updates over old ones.
 
-## Features (V1)
+## Dcam 2.0
 
-**Looks** (tap the look name at the top to show or hide the control panel)
-- 20 built-in looks: GOLD 200, PORTRA 400, SUPERIA 400, EKTAR 100, VELVIA 50, TRI-X 400, HP5 400, CINE 800T, TEAL ORANGE, MIDNIGHT, POLA 600, SX FADE, DISPO 27, DISPO GREEN, FLASH, CCD 2003, DIGI 99, SUNSET, SEPIA, FADE (plus ZERO for no filter)
-- Import your own 3D `.cube` LUTs with `+ LUT`
-- Live tinted preview
+The camera screen is kept calm. Everything else lives in its own place.
 
-**FX tab**
-- Date stamp (orange or white, retro `'26 11 16` style)
-- Light leaks: WARM, SUN, RED, COOL
-- Dust and scratches
-- Grain level: OFF / LOW / MED / HIGH
-- Frames: POLAROID, FILM strip, BLACK, WHITE
-- Double exposure
+- **Camera**: a clean viewfinder with flash, ratio, timer, zoom and flip on top of it. Tap to focus, pinch to zoom.
+- **Films**: tap the square next to the shutter. A grid of 20 films, each shown on a sample scene so you see its real colour, sorted into COLOR, B&W, CINE, INSTANT, DIGI and MOOD. Import your own `.cube` LUTs too.
+- **Tune**: exposure, date stamp, light leaks, grain, frames, dust and scratches, burst gap.
+- **Shoot modes**: PHOTO, BURST (choose 2 to 30 shots with the + and - buttons) and DOUBLE (the first shot ghosts over the viewfinder so you can line up the second).
+- **Settings**: RAW + JPEG (saves a .dng with every photo), keep the untouched original, shutter sound, mirror selfies, grid.
+- **Develop**: the gallery icon at the top applies the current film to any photo you pick.
 
-**SHOOT tab**
-- Ratio 4:3 / 1:1 / 16:9
-- Flash OFF / AUTO / ON
-- Timer 3s / 10s
-- Grid, exposure compensation
-- **Burst**: choose 2 to 30 photos and the gap between them (100 to 1000 ms)
-
-**Everything else**
-- Tap to focus, pinch to zoom, 1x / 2x / 3x, front/back flip
-- **EDIT**: pick a photo from your gallery and apply the current look and effects
-- Last-photo thumbnail opens in your gallery
-- Settings: **RAW + JPEG** (saves a `.dng` with every photo, if the phone supports it), save the untouched original too, shutter sound, mirror selfies, grid
-
-Photos are saved to `Pictures/Dcam`.
-
-Look names are close to real film stocks and cameras but they are original approximations, not official presets. Rename them before any Play Store release.
+Photos are saved to `Pictures/Dcam`. Film names are close to real film stocks but are original approximations, not official presets.
 
 ## Build
 
@@ -55,7 +36,7 @@ The signing key `app/dcam-release.jks` is committed on purpose so updates instal
 ```
 app/src/main/java/com/dcam/app/
   MainActivity.kt           entry point
-  DcamScreen.kt             Compose UI (preview, panel tabs, settings, zap)
+  ui/                       Theme, components, CameraScreen, FilmsSheet, TuneSheet, SettingsScreen
   DcamViewModel.kt          state, burst loop, timer, double exposure, LUT import, edit
   camera/CameraEngine.kt    CameraX preview, zoom, focus, flash, exposure, RAW+JPEG capture
   camera/BitmapUtil.kt      memory-safe photo decoding

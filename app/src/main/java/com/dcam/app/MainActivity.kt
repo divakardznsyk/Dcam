@@ -5,8 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import com.dcam.app.ui.DcamTheme
+import com.dcam.app.ui.Root
 
 class MainActivity : ComponentActivity() {
 
@@ -16,8 +16,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme(primary = Yellow)) {
-                DcamScreen(vm)
+            DcamTheme {
+                Root(vm)
             }
         }
     }

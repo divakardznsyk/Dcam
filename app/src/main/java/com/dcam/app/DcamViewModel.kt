@@ -7,7 +7,9 @@ import android.media.MediaActionSound
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -26,6 +28,7 @@ import com.dcam.app.filters.Look
 import com.dcam.app.filters.LookProcessor
 import com.dcam.app.filters.Ratio
 import com.dcam.app.filters.RenderOptions
+import com.dcam.app.filters.Samples
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -33,42 +36,42 @@ import kotlinx.coroutines.sync.Semaphore
 import java.io.File
 import java.util.Date
 
-enum class PanelTab { LOOK, FX, SHOOT }
+enum class ShootMode(val label: String) { PHOTO("PHOTO"), BURST("BURST"), DOUBLE("DOUBLE") }
 
 class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = app.getSharedPreferences("dcam", Context.MODE_PRIVATE)
     private val sound = MediaActionSound().apply { load(MediaActionSound.SHUTTER_CLICK) }
 
-    // ---- Look + effects
+    // ---- Films
     val looks = mutableStateListOf<Look>().apply { addAll(BuiltInLooks.all) }
+    /** Each film rendered on a sample scene, for the Films browser. */
+    val previews = mutableStateMapOf<String, Bitmap>()
     var selectedLook by mutableStateOf(looks.first { it.id == "gold200" })
+
+    // ---- Tune
     var dateStyle by mutableStateOf(DateStyle.OFF)
     var leak by mutableStateOf(LeakStyle.OFF)
     var dust by mutableStateOf(false)
     var grain by mutableStateOf(GrainLevel.MED)
     var frame by mutableStateOf(FrameStyle.NONE)
+    var exposureEv by mutableStateOf(0f)
 
-    // ---- Camera controls
-    var panelOpen by mutableStateOf(true)
-    var panelTab by mutableStateOf(PanelTab.LOOK)
+    // ---- Camera
     var frontCamera by mutableStateOf(false)
     var zoom by mutableStateOf(1f)
     var flash by mutableStateOf(FlashMode.OFF)
-    var timerSeconds by mutableStateOf(0)
+    var timerSeconds by mutableIntStateOf(0)
     var ratio by mutableStateOf(Ratio.R34)
-    var exposureEv by mutableStateOf(0f)
 
-    // ---- Burst
-    var burstOn by mutableStateOf(false)
+    // ---- Shoot mode
+    var mode by mutableStateOf(ShootMode.PHOTO)
         private set
-    var burstCount by mutableStateOf(5)
-    var burstIntervalMs by mutableStateOf(300)
+    var burstCount by mutableIntStateOf(5)
+    var burstIntervalMs by mutableIntStateOf(300)
 
-    // ---- Double exposure
-    var doubleExposure by mutableStateOf(false)
-        private set
-    var hasPendingFirst by mutableStateOf(false)
+    /** Faint copy of the first double-exposure shot, shown over the viewfinder. */
+    var ghost by mutableStateOf<Bitmap?>(null)
         private set
     private var pendingFirst: Bitmap? = null
 
@@ -87,11 +90,14 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Shooting state
     var busy by mutableStateOf(false)
         private set
-    var progress by mutableStateOf(0)
+    var progress by mutableIntStateOf(0)
         private set
-    var total by mutableStateOf(1)
+    var total by mutableIntStateOf(1)
         private set
-    var countdown by mutableStateOf(0)
+    var countdown by mutableIntStateOf(0)
+        private set
+    /** Goes up on every shutter press; the UI uses it to flash the screen. */
+    var shotCount by mutableIntStateOf(0)
         private set
     var message by mutableStateOf<String?>(null)
 
@@ -105,6 +111,7 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         loadSavedLuts()
+        buildPreviews(looks.toList())
     }
 
     // ------------------------------------------------------------ settings
@@ -115,17 +122,29 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
     fun updateMirrorSelfie(on: Boolean) { mirrorSelfie = on; prefs.edit().putBoolean("mirror", on).apply() }
     fun updateGrid(on: Boolean) { gridOn = on; prefs.edit().putBoolean("grid", on).apply() }
 
-    fun updateBurst(on: Boolean) {
-        burstOn = on
-        if (on) updateDoubleExposure(false)
+    fun selectMode(m: ShootMode) {
+        if (busy) return
+        mode = m
+        if (m != ShootMode.DOUBLE) clearPending()
     }
 
-    fun updateDoubleExposure(on: Boolean) {
-        doubleExposure = on
-        if (on) burstOn = false
-        if (!on) {
-            pendingFirst = null
-            hasPendingFirst = false
+    private fun clearPending() {
+        pendingFirst = null
+        ghost = null
+    }
+
+    // ------------------------------------------------------------ previews
+
+    private fun buildPreviews(list: List<Look>) {
+        viewModelScope.launch(Dispatchers.Default) {
+            val scene = Samples.scene()
+            for (look in list) {
+                try {
+                    previews[look.id] = LookProcessor.render(scene, RenderOptions(look = look))
+                } catch (_: Exception) {
+                    // a broken look just shows no preview
+                }
+            }
         }
     }
 
@@ -145,7 +164,7 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
     fun shoot(engine: CameraEngine) {
         if (busy) return
         busy = true
-        val shots = if (burstOn) burstCount else 1
+        val shots = if (mode == ShootMode.BURST) burstCount else 1
         total = shots
 
         viewModelScope.launch {
@@ -160,20 +179,22 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
                 for (i in 1..shots) {
                     progress = i
+                    shotCount++
                     if (shutterSound) sound.play(MediaActionSound.SHUTTER_CLICK)
                     val raw = engine.capture(mirrorSelfie)
                     val opts = currentOptions()
 
-                    val toProcess: Bitmap? = if (doubleExposure) {
+                    val toProcess: Bitmap? = if (mode == ShootMode.DOUBLE) {
                         val first = pendingFirst
                         if (first == null) {
                             pendingFirst = raw
-                            hasPendingFirst = true
+                            ghost = Bitmap.createScaledBitmap(
+                                raw, (raw.width / 6).coerceAtLeast(1), (raw.height / 6).coerceAtLeast(1), true
+                            )
                             message = "Now take the second exposure"
                             null
                         } else {
-                            pendingFirst = null
-                            hasPendingFirst = false
+                            clearPending()
                             LookProcessor.doubleExposure(first, raw)
                         }
                     } else raw
@@ -192,7 +213,7 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     if (i < shots) delay(burstIntervalMs.toLong())
                 }
-                if (!(doubleExposure && hasPendingFirst)) {
+                if (ghost == null) {
                     message = when {
                         shots > 1 -> "Saving $shots photos to Pictures/Dcam"
                         rawPlusJpeg -> "Saved JPEG + RAW to Pictures/Dcam"
@@ -219,8 +240,8 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
         lastUri = uri
     }
 
-    /** Applies the current look and effects to a photo picked from the gallery. */
-    fun editImage(uri: Uri) {
+    /** Applies the current film and tune settings to a photo picked from the gallery. */
+    fun developImage(uri: Uri) {
         viewModelScope.launch(Dispatchers.Default) {
             try {
                 message = "Developing..."
@@ -233,14 +254,14 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 message = "Saved to Pictures/Dcam"
             } catch (e: Exception) {
-                message = "Could not edit photo: ${e.message}"
+                message = "Could not develop photo: ${e.message}"
             }
         }
     }
 
     // ---------------------------------------------------------------- LUTs
 
-    /** Imports a .cube LUT chosen by the user and adds it as a new look. */
+    /** Imports a .cube LUT chosen by the user and adds it as a new film. */
     fun importLut(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -259,8 +280,9 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
                 val look = lutLook(lut)
                 looks.removeAll { it.id == look.id }
                 looks.add(look)
+                buildPreviews(listOf(look))
                 selectedLook = look
-                message = "Added look ${look.name}"
+                message = "Added film ${look.name}"
             } catch (e: Exception) {
                 message = "Could not import LUT: ${e.message}"
             }
@@ -269,13 +291,17 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun loadSavedLuts() {
         viewModelScope.launch(Dispatchers.IO) {
+            val added = mutableListOf<Look>()
             lutDir().listFiles { f -> f.extension == "cube" }?.forEach { f ->
                 try {
-                    looks.add(lutLook(CubeLut.parse(f.readText(), f.nameWithoutExtension)))
+                    val look = lutLook(CubeLut.parse(f.readText(), f.nameWithoutExtension))
+                    looks.add(look)
+                    added.add(look)
                 } catch (_: Exception) {
                     // skip unreadable files
                 }
             }
+            if (added.isNotEmpty()) buildPreviews(added)
         }
     }
 
