@@ -12,8 +12,8 @@ android {
         applicationId = "com.dcam.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "2.0.0"
+        versionCode = 4
+        versionName = "2.1.0"
     }
 
     // A fixed key is committed on purpose so every build is signed the same way

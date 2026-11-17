@@ -5,15 +5,19 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.net.Uri
 import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -37,28 +41,29 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.FlashAuto
 import androidx.compose.material.icons.outlined.FlashOff
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.FlipCameraAndroid
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -70,6 +75,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -77,18 +83,23 @@ import androidx.core.content.ContextCompat
 import com.dcam.app.DcamViewModel
 import com.dcam.app.ShootMode
 import com.dcam.app.camera.CameraEngine
-import com.dcam.app.filters.DateStyle
+import com.dcam.app.filters.DoubleBlend
 import com.dcam.app.filters.FlashMode
-import com.dcam.app.filters.FrameStyle
-import com.dcam.app.filters.GrainLevel
-import com.dcam.app.filters.LeakStyle
 import com.dcam.app.filters.Look
 import com.dcam.app.filters.Ratio
 import kotlinx.coroutines.delay
+import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 @Composable
-fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> Unit) {
+fun CameraScreen(
+    vm: DcamViewModel,
+    engine: CameraEngine,
+    onOpenSettings: () -> Unit,
+    onDevelop: (Uri) -> Unit,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val haptic = LocalHapticFeedback.current
@@ -96,6 +107,9 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
     var showFilms by remember { mutableStateOf(false) }
     var showTune by remember { mutableStateOf(false) }
     var focusPoint by remember { mutableStateOf<Offset?>(null) }
+    var evTick by remember { mutableIntStateOf(0) }
+    var evVisible by remember { mutableStateOf(false) }
+    var filmToast by remember { mutableStateOf(false) }
 
     var hasPermission by remember {
         mutableStateOf(
@@ -116,7 +130,11 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
 
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri -> if (uri != null) vm.developImage(uri) }
+    ) { uri -> if (uri != null) onDevelop(uri) }
+
+    val firstPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> if (uri != null) vm.setFirstFromGallery(uri) }
 
     val previewView = remember {
         PreviewView(context).apply {
@@ -126,8 +144,10 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
         }
     }
 
-    // Tap to focus, pinch to zoom
+    // Gestures on the viewfinder:
+    //   tap = focus, pinch = zoom, drag up/down = exposure, drag left/right = change film
     DisposableEffect(previewView) {
+        val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
         val tap = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
                 engine.focus(previewView, e.x, e.y)
@@ -141,9 +161,48 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
                 return true
             }
         })
-        previewView.setOnTouchListener { _, ev ->
+
+        var downX = 0f
+        var downY = 0f
+        var anchorX = 0f
+        var startEv = 0f
+        var axis = 0 // 0 undecided, 1 vertical (exposure), 2 horizontal (film), 3 ignore (pinch)
+
+        previewView.setOnTouchListener { v, ev ->
             pinch.onTouchEvent(ev)
             tap.onTouchEvent(ev)
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = ev.x; downY = ev.y; anchorX = ev.x
+                    startEv = vm.exposureEv
+                    axis = 0
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> axis = 3
+                MotionEvent.ACTION_MOVE -> if (axis != 3 && ev.pointerCount == 1) {
+                    val dx = ev.x - downX
+                    val dy = ev.y - downY
+                    if (axis == 0 && max(abs(dx), abs(dy)) > slop * 2f) {
+                        axis = if (abs(dy) > abs(dx)) 1 else 2
+                    }
+                    if (axis == 1) {
+                        // dragging the full height of the viewfinder changes exposure by 4 stops
+                        val ev2 = (startEv - dy / v.height * 4f).coerceIn(-2f, 2f)
+                        vm.exposureEv = (ev2 * 10f).roundToInt() / 10f
+                        evTick++
+                    } else if (axis == 2) {
+                        val step = v.width * 0.28f
+                        while (ev.x - anchorX > step) {
+                            anchorX += step
+                            if (vm.stepFilm(-1)) v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        }
+                        while (anchorX - ev.x > step) {
+                            anchorX -= step
+                            if (vm.stepFilm(1)) v.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> axis = 0
+            }
             true
         }
         onDispose { previewView.setOnTouchListener(null) }
@@ -160,6 +219,20 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             vm.message = null
         }
+    }
+    LaunchedEffect(evTick) {
+        if (evTick > 0) {
+            evVisible = true
+            delay(1200)
+            evVisible = false
+        }
+    }
+    var firstFilm by remember { mutableStateOf(true) }
+    LaunchedEffect(vm.selectedLook.id) {
+        if (firstFilm) { firstFilm = false; return@LaunchedEffect }
+        filmToast = true
+        delay(1000)
+        filmToast = false
     }
 
     // White flash when the shutter fires
@@ -182,7 +255,7 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 22.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+                .padding(start = 22.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -219,10 +292,13 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
                     modifier = Modifier.fillMaxSize(),
                 )
 
+                // what the final photo will get: vignette, grain, light leak, dust, date, frame
+                LiveOverlay(vm, Modifier.fillMaxSize())
+
                 vm.ghost?.let {
                     Image(
                         bitmap = it.asImageBitmap(), contentDescription = null,
-                        contentScale = ContentScale.Crop, alpha = 0.4f,
+                        contentScale = ContentScale.Crop, alpha = 0.45f,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -248,6 +324,44 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
                         "${vm.countdown}", color = DC.Cream, fontFamily = Serif, fontSize = 110.sp,
                         modifier = Modifier.align(Alignment.Center),
                     )
+                }
+
+                // film name pops up when you swipe between films
+                val toastAlpha by animateFloatAsState(if (filmToast) 1f else 0f, tween(220), label = "toast")
+                Column(
+                    Modifier
+                        .align(Alignment.Center)
+                        .alpha(toastAlpha),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        vm.selectedLook.name, color = Color.White, fontFamily = Serif, fontSize = 34.sp,
+                        style = androidx.compose.ui.text.TextStyle(
+                            shadow = androidx.compose.ui.graphics.Shadow(Color.Black, blurRadius = 16f),
+                        ),
+                    )
+                    Text(
+                        vm.selectedLook.desc, color = Color.White, fontSize = 13.sp,
+                        style = androidx.compose.ui.text.TextStyle(
+                            shadow = androidx.compose.ui.graphics.Shadow(Color.Black, blurRadius = 12f),
+                        ),
+                    )
+                }
+
+                // exposure readout, shown while dragging and whenever it is not zero
+                if (evVisible || vm.exposureEv != 0f) {
+                    GlassChip(
+                        onClick = { vm.exposureEv = 0f },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 10.dp),
+                    ) {
+                        Icon(Icons.Outlined.WbSunny, "Exposure", tint = DC.Ember, modifier = Modifier.size(16.dp))
+                        Text(
+                            String.format(Locale.US, "%+.1f", vm.exposureEv),
+                            color = DC.Cream, fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
 
                 // top overlay: flash, ratio, timer
@@ -327,25 +441,25 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
             }
         }
 
-        // ---- Film strip: current film + tune
-        Row(
+        // ---- Film strip, or the settings of the current shoot mode (same height, so nothing jumps)
+        Box(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp, end = 14.dp, top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .height(100.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(vm.selectedLook.name, color = DC.Cream, fontFamily = Serif, fontSize = 22.sp)
-                Text(effectsSummary(vm), color = DC.Muted, fontFamily = Mono, fontSize = 11.sp)
+            when (vm.mode) {
+                ShootMode.PHOTO -> FilmStrip(vm, onOpenAll = { showFilms = true })
+                ShootMode.BURST -> BurstPanel(vm)
+                ShootMode.DOUBLE -> DoublePanel(vm, onPickFirst = { firstPicker.launch("image/*") })
             }
-            IconBtn(Icons.Outlined.Tune, "Tune", bg = DC.Surface2, size = 46.dp) { showTune = true }
         }
 
         // ---- Shoot mode selector
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 14.dp),
+                .padding(top = 6.dp),
             horizontalArrangement = Arrangement.Center,
         ) {
             ShootMode.entries.forEach { m ->
@@ -371,45 +485,12 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
             }
         }
 
-        // ---- Mode hint row (fixed height so nothing jumps)
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(44.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (vm.mode) {
-                ShootMode.BURST -> Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    IconBtn(Icons.Outlined.Remove, "Fewer shots", bg = DC.Surface2, size = 36.dp) {
-                        vm.burstCount = (vm.burstCount - 1).coerceAtLeast(2)
-                    }
-                    Text(
-                        "${vm.burstCount} SHOTS", color = DC.Cream, fontFamily = Mono,
-                        fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.width(92.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    )
-                    IconBtn(Icons.Outlined.Add, "More shots", bg = DC.Surface2, size = 36.dp) {
-                        vm.burstCount = (vm.burstCount + 1).coerceAtMost(30)
-                    }
-                }
-                ShootMode.DOUBLE -> Text(
-                    if (vm.ghost != null) "Line up the second exposure" else "Two shots, blended into one",
-                    color = DC.Muted, fontSize = 13.sp,
-                )
-                ShootMode.PHOTO -> Unit
-            }
-        }
-
         // ---- Shutter row
         Row(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 28.dp)
-                .padding(bottom = 18.dp),
+                .padding(top = 6.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -439,13 +520,14 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
                 }
             }
 
-            // shutter
+            // shutter (during a burst, tap again to stop)
             val label = when {
                 vm.countdown > 0 -> "${vm.countdown}"
                 vm.busy && vm.total > 1 -> "${vm.progress}/${vm.total}"
                 vm.ghost != null -> "2"
                 else -> null
             }
+            val canTap = !vm.busy || vm.mode == ShootMode.BURST
             Box(
                 Modifier
                     .size(88.dp)
@@ -453,33 +535,19 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
                     .padding(7.dp)
                     .clip(CircleShape)
                     .background(if (vm.busy) DC.Ember else DC.Cream)
-                    .clickable(enabled = !vm.busy) {
+                    .clickable(enabled = canTap) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         vm.shoot(engine)
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 if (label != null) {
-                    Text(label, color = DC.Bg, fontFamily = Mono, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(label, color = DC.Bg, fontFamily = Mono, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
-            // film picker: shows the current film's look
-            Box(
-                Modifier
-                    .size(58.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(DC.Surface2)
-                    .border(2.dp, DC.Ember, RoundedCornerShape(18.dp))
-                    .clickable { showFilms = true },
-            ) {
-                vm.previews[vm.selectedLook.id]?.let {
-                    Image(
-                        bitmap = it.asImageBitmap(), contentDescription = "Choose film",
-                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+            // tune
+            IconBtn(Icons.Outlined.Tune, "Tune", bg = DC.Surface2, size = 58.dp) { showTune = true }
         }
     }
 
@@ -493,15 +561,65 @@ fun CameraScreen(vm: DcamViewModel, engine: CameraEngine, onOpenSettings: () -> 
     if (showTune) TuneSheet(vm) { showTune = false }
 }
 
-private fun effectsSummary(vm: DcamViewModel): String {
-    val parts = mutableListOf<String>()
-    if (vm.dateStyle != DateStyle.OFF) parts.add("DATE")
-    if (vm.leak != LeakStyle.OFF) parts.add("LEAK")
-    if (vm.dust) parts.add("DUST")
-    if (vm.frame != FrameStyle.NONE) parts.add("FRAME")
-    if (vm.grain != GrainLevel.MED) parts.add("GRAIN ${vm.grain.name}")
-    return if (parts.isEmpty()) "CLEAN" else parts.joinToString(" · ")
+// ------------------------------------------------------------- mode panels
+
+@Composable
+private fun BurstPanel(vm: DcamViewModel) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("SHOTS")
+            DcSlider(
+                value = vm.burstCount.toFloat(),
+                onChange = { vm.burstCount = it.roundToInt() },
+                range = 2f..100f,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 6.dp),
+            )
+            Text(
+                "${vm.burstCount}", color = DC.Cream, fontFamily = Serif, fontSize = 28.sp,
+                textAlign = TextAlign.End, modifier = Modifier.width(52.dp),
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionLabel("EVERY")
+            Segmented(listOf(1000, 2000, 3000, 5000, 10000), vm.burstIntervalMs, { "${it / 1000}s" }) {
+                vm.burstIntervalMs = it
+            }
+        }
+    }
 }
+
+@Composable
+private fun DoublePanel(vm: DcamViewModel, onPickFirst: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionLabel("BLEND")
+            Segmented(DoubleBlend.entries, vm.blend, { it.name }) { vm.blend = it }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ActionChip("FIRST FROM GALLERY", onPickFirst, enabled = !vm.busy)
+            ActionChip("RESET", { vm.clearPending() }, enabled = vm.ghost != null && !vm.busy)
+            Text(
+                if (vm.ghost != null) "STEP 2 / 2" else "STEP 1 / 2",
+                color = DC.Muted, fontFamily = Mono, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+    }
+}
+
+// ------------------------------------------------------------- viewfinder bits
 
 @Composable
 private fun GridOverlay() {
@@ -540,7 +658,7 @@ private fun FocusRing(point: Offset?, onDone: () -> Unit) {
     }
 }
 
-/** Approximate live preview: tint the camera view with the film's colour matrix (LUT films show unfiltered). */
+/** Approximate live colour: tint the camera view with the film's colour matrix (LUT films show unfiltered). */
 private fun applyLivePreview(view: View, look: Look) {
     if (look.isIdentity || look.lut != null) {
         view.setLayerType(View.LAYER_TYPE_NONE, null)

@@ -87,7 +87,7 @@ fun SettingsScreen(vm: DcamViewModel, rawSupported: Boolean, onBack: () -> Unit)
             SectionLabel("ABOUT", Modifier.padding(top = 10.dp))
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Dcam 2.0", color = DC.Cream, fontFamily = Serif, fontSize = 20.sp)
+                    Text("Dcam 2.1", color = DC.Cream, fontFamily = Serif, fontSize = 20.sp)
                     Text("Photos are saved in Pictures/Dcam", color = DC.Muted, fontSize = 13.sp)
                 }
             }

@@ -2,6 +2,7 @@ package com.dcam.app.ui
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -144,5 +145,22 @@ fun DcSlider(
             activeTrackColor = DC.Ember,
             inactiveTrackColor = DC.Line,
         ),
+    )
+}
+
+/** A tappable pill for one-off actions (as opposed to [Segmented], where one option stays selected). */
+@Composable
+fun ActionChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    Text(
+        text,
+        color = if (enabled) DC.Cream else DC.Muted,
+        fontFamily = Mono,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, DC.Line, RoundedCornerShape(50))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
     )
 }

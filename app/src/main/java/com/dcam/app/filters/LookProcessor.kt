@@ -34,7 +34,7 @@ object LookProcessor {
             if (bmp === src || !bmp.isMutable) bmp = bmp.copy(Bitmap.Config.ARGB_8888, true)
             val canvas = Canvas(bmp)
             val rnd = Random(System.nanoTime())
-            if (o.leak != LeakStyle.OFF) drawLeak(canvas, bmp.width, bmp.height, o.leak, rnd)
+            if (o.leak != LeakStyle.OFF) drawLeak(canvas, bmp.width, bmp.height, o.leak, o.leakLeft, o.leakY)
             if (o.dust) drawDust(canvas, bmp.width, bmp.height, rnd)
             if (o.dateStyle != DateStyle.OFF) drawDate(canvas, bmp.width, bmp.height, o)
         }
@@ -43,14 +43,19 @@ object LookProcessor {
         return bmp
     }
 
-    /** Screen-blends [second] over [first] for a double exposure. */
-    fun doubleExposure(first: Bitmap, second: Bitmap): Bitmap {
+    /** Mixes two exposures into one picture. [second] is cropped to match [first]. */
+    fun doubleExposure(first: Bitmap, second: Bitmap, blend: DoubleBlend): Bitmap {
         val out = first.copy(Bitmap.Config.ARGB_8888, true)
+        val fitted = cropToRatio(second, out.width.toFloat() / out.height)
+        val scaled = if (fitted.width != out.width || fitted.height != out.height) {
+            Bitmap.createScaledBitmap(fitted, out.width, out.height, true)
+        } else fitted
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
-        val scaled = if (second.width != out.width || second.height != out.height) {
-            Bitmap.createScaledBitmap(second, out.width, out.height, true)
-        } else second
+        when (blend) {
+            DoubleBlend.SOFT -> paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+            DoubleBlend.LIGHTEN -> paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
+            DoubleBlend.MIX -> paint.alpha = 140
+        }
         Canvas(out).drawBitmap(scaled, 0f, 0f, paint)
         return out
     }
@@ -145,14 +150,13 @@ object LookProcessor {
 
     // ------------------------------------------------------------- overlays
 
-    private fun drawLeak(canvas: Canvas, w: Int, h: Int, style: LeakStyle, rnd: Random) {
+    private fun drawLeak(canvas: Canvas, w: Int, h: Int, style: LeakStyle, left: Boolean, leakY: Float) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
         val wf = w.toFloat()
         val hf = h.toFloat()
-        val left = rnd.nextBoolean()
         val edgeX = if (left) 0f else wf
-        val cy = hf * (0.15f + 0.7f * rnd.nextFloat())
+        val cy = hf * leakY
 
         when (style) {
             LeakStyle.WARM -> {

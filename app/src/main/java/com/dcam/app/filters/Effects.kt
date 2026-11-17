@@ -20,6 +20,9 @@ enum class Ratio(val label: String, val value: Float) {
 
 enum class FlashMode { OFF, AUTO, ON }
 
+/** How the two exposures of a double exposure are mixed. */
+enum class DoubleBlend { SOFT, MIX, LIGHTEN }
+
 /** Everything the processor needs to turn a raw capture into the final photo. */
 data class RenderOptions(
     val look: Look,
@@ -31,4 +34,7 @@ data class RenderOptions(
     /** null = keep the original shape (used when editing gallery photos) */
     val ratio: Ratio? = null,
     val date: Date = Date(),
+    /** Which edge the light leak comes from and how far down it sits (0..1). */
+    val leakLeft: Boolean = true,
+    val leakY: Float = 0.4f,
 )

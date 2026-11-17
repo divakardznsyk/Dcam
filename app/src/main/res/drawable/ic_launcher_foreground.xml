@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- camera body with viewfinder bump -->
+    <path
+        android:fillColor="#F2EBDD"
+        android:pathData="M32,42 L44,42 L47,36 L61,36 L64,42 L76,42 A4,4 0 0 1 80,46 L80,70 A4,4 0 0 1 76,74 L32,74 A4,4 0 0 1 28,70 L28,46 A4,4 0 0 1 32,42 Z" />
+
+    <!-- lens: dark ring, ember glass, dark centre -->
+    <path
+        android:fillColor="#121110"
+        android:pathData="M54,46 A12,12 0 1 1 54,70 A12,12 0 1 1 54,46 Z" />
+    <path
+        android:fillColor="#FF6A2B"
+        android:pathData="M54,50 A8,8 0 1 1 54,66 A8,8 0 1 1 54,50 Z" />
+    <path
+        android:fillColor="#121110"
+        android:pathData="M54,54 A4,4 0 1 1 54,62 A4,4 0 1 1 54,54 Z" />
+
+    <!-- little flash window -->
+    <path
+        android:fillColor="#FF6A2B"
+        android:pathData="M68,46 L75,46 L75,50 L68,50 Z" />
+</vector>

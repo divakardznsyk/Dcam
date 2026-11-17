@@ -89,23 +89,6 @@ fun TuneSheet(vm: DcamViewModel, onDismiss: () -> Unit) {
                 Toggle(vm.dust) { vm.dust = it }
             }
 
-            if (vm.mode == ShootMode.BURST) {
-                Group("BURST GAP") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        DcSlider(
-                            value = vm.burstIntervalMs.toFloat(),
-                            onChange = { vm.burstIntervalMs = (it / 50f).roundToInt() * 50 },
-                            range = 100f..1000f,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            "${vm.burstIntervalMs}ms",
-                            color = DC.Cream, fontFamily = Mono, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 12.dp),
-                        )
-                    }
-                }
-            }
             Spacer(Modifier.height(4.dp))
         }
     }
