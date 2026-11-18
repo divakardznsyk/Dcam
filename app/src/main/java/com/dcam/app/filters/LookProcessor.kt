@@ -45,27 +45,44 @@ object LookProcessor {
 
     /** Mixes two exposures into one picture. [second] is cropped to match [first]. */
     fun doubleExposure(first: Bitmap, second: Bitmap, blend: DoubleBlend): Bitmap {
-        val out = first.copy(Bitmap.Config.ARGB_8888, true)
-        val fitted = cropToRatio(second, out.width.toFloat() / out.height)
-        val scaled = if (fitted.width != out.width || fitted.height != out.height) {
-            Bitmap.createScaledBitmap(fitted, out.width, out.height, true)
+        val fitted = cropToRatio(second, first.width.toFloat() / first.height)
+        val scaled = if (fitted.width != first.width || fitted.height != first.height) {
+            Bitmap.createScaledBitmap(fitted, first.width, first.height, true)
         } else fitted
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        fun gain(k: Float) = ColorMatrixColorFilter(android.graphics.ColorMatrix(floatArrayOf(
+            k, 0f, 0f, 0f, 0f, 0f, k, 0f, 0f, 0f, 0f, 0f, k, 0f, 0f, 0f, 0f, 0f, 1f, 0f)))
+        // Each exposure is dimmed first, like real film where two half-exposures add up to one.
+        val k = when (blend) { DoubleBlend.SOFT -> 0.72f; DoubleBlend.LIGHTEN -> 0.9f; DoubleBlend.MIX -> 1f }
+        val out = Bitmap.createBitmap(first.width, first.height, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        val p1 = Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = gain(k) }
+        c.drawBitmap(first, 0f, 0f, p1)
+        val p2 = Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = gain(k) }
         when (blend) {
-            DoubleBlend.SOFT -> paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
-            DoubleBlend.LIGHTEN -> paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
-            DoubleBlend.MIX -> paint.alpha = 140
+            DoubleBlend.SOFT -> p2.xfermode = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+            DoubleBlend.LIGHTEN -> p2.xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
+            DoubleBlend.MIX -> p2.alpha = 128
         }
-        Canvas(out).drawBitmap(scaled, 0f, 0f, paint)
+        c.drawBitmap(scaled, 0f, 0f, p2)
         return out
     }
 
     private val samples = HashMap<String, Bitmap>()
+    private var sampleVer = -1
 
-    /** A small painted test scene run through [look], for film thumbnails. */
+    /** A thumbnail of [photo] (or a test scene) as this film would render it. */
     @Synchronized
-    fun sample(look: Look): Bitmap = samples.getOrPut(look.id) {
+    fun sample(look: Look, photo: Bitmap?, ver: Int): Bitmap {
+        if (ver != sampleVer) { samples.clear(); sampleVer = ver }
+        return samples.getOrPut(look.id) { applyLook(base(photo), look, 0.6f) }
+    }
+
+    private fun base(photo: Bitmap?): Bitmap {
         val w = 200; val h = 148
+        if (photo != null) {
+            val fit = cropToRatio(photo, w.toFloat() / h)
+            return Bitmap.createScaledBitmap(fit, w, h, true).copy(Bitmap.Config.ARGB_8888, true)
+        }
         val scene = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(scene); val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.shader = LinearGradient(0f, 0f, 0f, h * 0.7f, intArrayOf(0xFF5E9BE0.toInt(), 0xFFF7C9A0.toInt()), null, Shader.TileMode.CLAMP)
@@ -75,8 +92,7 @@ object LookProcessor {
         p.color = 0xFF245238.toInt(); c.drawOval(w * 0.35f, h * 0.68f, w * 1.3f, h * 1.5f, p)
         p.color = 0xFFD9A07F.toInt(); c.drawCircle(w * 0.3f, h * 0.5f, 16f, p)
         p.color = 0xFFC93A2E.toInt(); c.drawRect(w * 0.22f, h * 0.62f, w * 0.38f, h * 0.9f, p)
-        p.color = 0xFFFFFFFF.toInt(); c.drawRect(w * 0.55f, h * 0.76f, w * 0.7f, h * 0.9f, p)
-        applyLook(scene, look, 0.6f)
+        return scene
     }
 
     // ---------------------------------------------------------------- look

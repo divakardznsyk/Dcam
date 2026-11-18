@@ -55,7 +55,7 @@ fun FilmsSheet(vm: DcamViewModel, onImportLut: () -> Unit, onDismiss: () -> Unit
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Films", color = DC.Cream, fontFamily = Serif, fontSize = 30.sp)
-                    Text("Each film comes with its own camera", color = DC.Muted, fontSize = 13.sp)
+                    Text("Previewed on what your camera sees right now", color = DC.Muted, fontSize = 13.sp)
                 }
                 Text(
                     "+ IMPORT LUT", color = DC.Cream, fontFamily = Mono, fontSize = 11.sp,

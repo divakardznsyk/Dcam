@@ -211,6 +211,16 @@ fun CameraScreen(
     LaunchedEffect(hasPermission, vm.frontCamera, vm.rawPlusJpeg) {
         if (hasPermission) engine.bind(lifecycleOwner, previewView, vm.frontCamera, vm.zoom, vm.rawPlusJpeg)
     }
+    LaunchedEffect(hasPermission, vm.frontCamera, showFilms) {
+        if (!hasPermission) return@LaunchedEffect
+        delay(if (showFilms) 100 else 1500)
+        try {
+            previewView.bitmap?.let { b ->
+                val w = 240; val h = (b.height * (w / b.width.toFloat())).toInt().coerceAtLeast(1)
+                SampleSource.set(android.graphics.Bitmap.createScaledBitmap(b, w, h, true))
+            }
+        } catch (e: Exception) { }
+    }
     LaunchedEffect(vm.zoom) { engine.setZoom(vm.zoom) }
     LaunchedEffect(vm.flash, vm.frontCamera) { engine.setFlash(vm.flash) }
     LaunchedEffect(vm.exposureEv) { engine.setExposure(vm.exposureEv) }
