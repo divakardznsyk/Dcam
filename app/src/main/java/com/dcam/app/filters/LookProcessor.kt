@@ -60,6 +60,25 @@ object LookProcessor {
         return out
     }
 
+    private val samples = HashMap<String, Bitmap>()
+
+    /** A small painted test scene run through [look], for film thumbnails. */
+    @Synchronized
+    fun sample(look: Look): Bitmap = samples.getOrPut(look.id) {
+        val w = 200; val h = 148
+        val scene = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(scene); val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.shader = LinearGradient(0f, 0f, 0f, h * 0.7f, intArrayOf(0xFF5E9BE0.toInt(), 0xFFF7C9A0.toInt()), null, Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
+        p.color = 0xFFFFF1B8.toInt(); c.drawCircle(w * 0.78f, h * 0.3f, 15f, p)
+        p.color = 0xFF3E7A4A.toInt(); c.drawOval(-40f, h * 0.55f, w * 0.7f, h * 1.3f, p)
+        p.color = 0xFF245238.toInt(); c.drawOval(w * 0.35f, h * 0.68f, w * 1.3f, h * 1.5f, p)
+        p.color = 0xFFD9A07F.toInt(); c.drawCircle(w * 0.3f, h * 0.5f, 16f, p)
+        p.color = 0xFFC93A2E.toInt(); c.drawRect(w * 0.22f, h * 0.62f, w * 0.38f, h * 0.9f, p)
+        p.color = 0xFFFFFFFF.toInt(); c.drawRect(w * 0.55f, h * 0.76f, w * 0.7f, h * 0.9f, p)
+        applyLook(scene, look, 0.6f)
+    }
+
     // ---------------------------------------------------------------- look
 
     private fun applyLook(src: Bitmap, look: Look, grainScale: Float): Bitmap {

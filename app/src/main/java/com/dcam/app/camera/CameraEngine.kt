@@ -62,7 +62,7 @@ class CameraEngine(private val context: Context) {
             val selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA
             else CameraSelector.DEFAULT_BACK_CAMERA
 
-            val builder = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            val builder = ImageCapture.Builder().setCaptureMode(if (front) ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY else ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             rawActive = false
             rawSupported = false
             val info = selector.filter(provider.availableCameraInfos).firstOrNull()
@@ -138,7 +138,14 @@ class CameraEngine(private val context: Context) {
     /** Takes one photo and returns it upright. Handles the RAW+JPEG case too. */
     suspend fun capture(mirrorSelfie: Boolean): Bitmap {
         val mirror = frontFacing && mirrorSelfie
-        return if (rawActive) captureRawPair(mirror) else captureJpeg(mirror)
+        if (rawActive) return captureRawPair(mirror)
+        return try {
+            kotlinx.coroutines.withTimeout(8000) { captureJpeg(mirror) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            captureViaFile(mirror) // some front cameras fail the in-memory path
+        }
     }
 
     private suspend fun captureJpeg(mirror: Boolean): Bitmap = suspendCancellableCoroutine { cont ->
@@ -210,6 +217,17 @@ class CameraEngine(private val context: Context) {
                     cont.resumeWithException(exception)
                 }
             }
+        })
+    }
+
+    private suspend fun captureViaFile(mirror: Boolean): Bitmap = suspendCancellableCoroutine { cont ->
+        val capture = imageCapture ?: run { cont.resumeWithException(IllegalStateException("Camera not ready")); return@suspendCancellableCoroutine }
+        val file = File(context.cacheDir, "shot_${System.nanoTime()}.jpg")
+        capture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), executor, object : ImageCapture.OnImageSavedCallback {
+            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                try { cont.resume(BitmapUtil.fromFile(file, mirror)) } catch (e: Exception) { cont.resumeWithException(e) } finally { file.delete() }
+            }
+            override fun onError(exception: ImageCaptureException) { file.delete(); cont.resumeWithException(exception) }
         })
     }
 }

@@ -154,8 +154,7 @@ fun ActionChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     Text(
         text,
         color = if (enabled) DC.Cream else DC.Muted,
-        fontFamily = Mono,
-        fontSize = 12.sp,
+        fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
         modifier = modifier
             .clip(RoundedCornerShape(50))

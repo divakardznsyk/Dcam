@@ -595,30 +595,6 @@ private fun BurstPanel(vm: DcamViewModel) {
     }
 }
 
-@Composable
-private fun DoublePanel(vm: DcamViewModel, onPickFirst: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionLabel("BLEND")
-            Segmented(DoubleBlend.entries, vm.blend, { it.name }) { vm.blend = it }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ActionChip("FIRST FROM GALLERY", onPickFirst, enabled = !vm.busy)
-            ActionChip("RESET", { vm.clearPending() }, enabled = vm.ghost != null && !vm.busy)
-            Text(
-                if (vm.ghost != null) "STEP 2 / 2" else "STEP 1 / 2",
-                color = DC.Muted, fontFamily = Mono, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-        }
-    }
-}
-
 // ------------------------------------------------------------- viewfinder bits
 
 @Composable

@@ -145,5 +145,16 @@ object BuiltInLooks {
             fade = 0.22f, grain = 0.12f, vignette = 0.15f,
             camera = "RANGEFINDER", body = 0xFF8C8F91, trim = 0xFFE0E0DC,
         ),
+        Look("blade", "BLADE 2049", desc = "Amber haze over cold teal", saturation = 1.1f, contrast = 1.25f, r = 1.08f, b = 0.96f, grain = 0.25f, vignette = 0.40f, shadow = floatArrayOf(-0.05f, 0.03f, 0.07f), highlight = floatArrayOf(0.12f, 0.05f, -0.08f)),
+        Look("madmax", "FURY ROAD", desc = "Scorched orange, electric sky", saturation = 1.5f, contrast = 1.30f, r = 1.12f, g = 0.96f, b = 0.85f, grain = 0.30f, vignette = 0.35f, shadow = floatArrayOf(-0.04f, 0.03f, 0.08f), highlight = floatArrayOf(0.10f, 0.04f, -0.06f)),
+        Look("matrix", "MATRIX", desc = "Sickly green, crushed blacks", saturation = 0.80f, contrast = 1.22f, r = 0.82f, g = 1.08f, b = 0.86f, grain = 0.30f, vignette = 0.35f, shadow = floatArrayOf(-0.03f, 0.05f, -0.01f), highlight = floatArrayOf(0.0f, 0.05f, 0.0f)),
+        Look("budapest", "BUDAPEST", desc = "Candy pastels, storybook pink", saturation = 1.1f, contrast = 0.95f, brightness = 0.05f, r = 1.06f, b = 1.02f, fade = 0.08f, grain = 0.12f, shadow = floatArrayOf(0.05f, 0.0f, 0.04f), highlight = floatArrayOf(0.04f, 0.02f, 0.0f)),
+        Look("dune", "DUNE", desc = "Bleached sand, quiet gold", saturation = 0.45f, contrast = 1.10f, r = 1.15f, b = 0.75f, fade = 0.08f, grain = 0.20f, vignette = 0.30f, highlight = floatArrayOf(0.06f, 0.03f, -0.04f)),
+        Look("se7en", "SE7EN", desc = "Bleach bypass, rain and grit", saturation = 0.45f, contrast = 1.50f, brightness = -0.04f, b = 0.95f, grain = 0.60f, vignette = 0.50f, shadow = floatArrayOf(0.0f, 0.02f, 0.0f)),
+        Look("mood", "IN THE MOOD", desc = "Lipstick red, smoky shadows", saturation = 1.3f, contrast = 1.15f, r = 1.15f, g = 0.9f, b = 0.85f, grain = 0.30f, vignette = 0.45f, shadow = floatArrayOf(0.06f, -0.02f, 0.0f), highlight = floatArrayOf(0.04f, 0.02f, 0.0f)),
+        Look("drive", "NEON DRIVE", desc = "Hot pink, midnight blue", saturation = 1.4f, contrast = 1.25f, g = 0.9f, b = 1.15f, grain = 0.25f, vignette = 0.40f, shadow = floatArrayOf(0.02f, -0.02f, 0.08f), highlight = floatArrayOf(0.10f, 0.0f, 0.06f)),
+        Look("amelie", "AMELIE", desc = "Green-gold, warm and cheeky", saturation = 1.35f, contrast = 1.10f, r = 1.10f, g = 1.08f, b = 0.75f, grain = 0.20f, vignette = 0.30f, shadow = floatArrayOf(0.04f, 0.04f, -0.03f), highlight = floatArrayOf(0.04f, 0.02f, -0.04f)),
+        Look("barbie", "DREAMHOUSE", desc = "Bubblegum, bright and flat", saturation = 1.4f, contrast = 0.95f, brightness = 0.06f, r = 1.12f, g = 0.95f, b = 1.08f, grain = 0.05f, highlight = floatArrayOf(0.05f, 0.0f, 0.03f)),
+        Look("oppen", "IMAX 70", desc = "Heavy grain, warm daylight", saturation = 0.85f, contrast = 1.25f, r = 1.06f, b = 0.92f, fade = 0.05f, grain = 0.50f, vignette = 0.30f),
     )
 }
