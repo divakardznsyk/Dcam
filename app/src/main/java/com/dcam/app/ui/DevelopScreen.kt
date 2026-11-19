@@ -99,7 +99,7 @@ fun DevelopScreen(vm: DcamViewModel, uri: Uri, onClose: () -> Unit) {
                     .padding(start = 6.dp),
             )
             Text(
-                "SAVE", color = DC.Bg, fontFamily = Mono, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                "Save", color = DC.Bg, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
                     .background(DC.Ember)
@@ -135,7 +135,7 @@ fun DevelopScreen(vm: DcamViewModel, uri: Uri, onClose: () -> Unit) {
 
         Text(
             "${vm.selectedLook.name}  ·  ${vm.selectedLook.desc}",
-            color = DC.Muted, fontFamily = Mono, fontSize = 11.sp,
+            color = DC.Muted, fontSize = 11.sp,
             modifier = Modifier.padding(start = 24.dp, top = 8.dp, end = 24.dp),
         )
         FilmStrip(vm, Modifier.padding(vertical = 10.dp).height(96.dp))

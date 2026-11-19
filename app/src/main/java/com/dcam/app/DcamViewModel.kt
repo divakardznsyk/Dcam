@@ -39,7 +39,7 @@ import java.io.File
 import java.util.Date
 import kotlin.random.Random
 
-enum class ShootMode(val label: String) { PHOTO("PHOTO"), BURST("BURST"), DOUBLE("DOUBLE") }
+enum class ShootMode(val label: String) { PHOTO("Photo"), BURST("Burst"), DOUBLE("Double") }
 
 class DcamViewModel(app: Application) : AndroidViewModel(app) {
 

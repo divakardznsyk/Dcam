@@ -71,12 +71,10 @@ fun GlassChip(modifier: Modifier = Modifier, onClick: () -> Unit, content: @Comp
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
-        text,
+        text.lowercase().replaceFirstChar { it.uppercase() },
         color = DC.Muted,
-        fontFamily = Mono,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.6.sp,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
         modifier = modifier,
     )
 }
@@ -93,7 +91,6 @@ fun <T> Segmented(options: List<T>, selected: T, label: (T) -> String, onSelect:
             Text(
                 label(o),
                 color = if (sel) DC.Bg else DC.Muted,
-                fontFamily = Mono,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier

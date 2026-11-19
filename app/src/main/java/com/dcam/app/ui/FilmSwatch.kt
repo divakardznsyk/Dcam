@@ -31,12 +31,12 @@ object SampleSource {
 
 /** A test scene as this film would render it, so you pick by the actual colour. */
 @Composable
-fun CameraArt(look: Look, modifier: Modifier = Modifier) {
+fun CameraArt(look: Look, modifier: Modifier = Modifier, radius: androidx.compose.ui.unit.Dp = 12.dp) {
     val img by produceState<ImageBitmap?>(null, look.id, SampleSource.ver) {
         val src = SampleSource.bmp; val v = SampleSource.ver
         value = withContext(Dispatchers.Default) { LookProcessor.sample(look, src, v).asImageBitmap() }
     }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(radius)
     val m = modifier.aspectRatio(1.35f).clip(shape).background(DC.Surface2)
     img?.let { Image(it, null, m, contentScale = ContentScale.Crop) } ?: androidx.compose.foundation.layout.Box(m)
 }

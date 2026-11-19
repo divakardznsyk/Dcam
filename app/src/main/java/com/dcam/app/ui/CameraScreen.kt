@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -369,7 +370,7 @@ fun CameraScreen(
                         Icon(Icons.Outlined.WbSunny, "Exposure", tint = DC.Ember, modifier = Modifier.size(16.dp))
                         Text(
                             String.format(Locale.US, "%+.1f", vm.exposureEv),
-                            color = DC.Cream, fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            color = DC.Cream, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -398,7 +399,7 @@ fun CameraScreen(
                     GlassChip(onClick = {
                         vm.ratio = Ratio.entries[(vm.ratio.ordinal + 1) % Ratio.entries.size]
                     }) {
-                        Text(vm.ratio.label, color = DC.Cream, fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(vm.ratio.label, color = DC.Cream, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     GlassChip(onClick = {
                         vm.timerSeconds = when (vm.timerSeconds) { 0 -> 3; 3 -> 10; else -> 0 }
@@ -409,7 +410,7 @@ fun CameraScreen(
                             modifier = Modifier.size(18.dp),
                         )
                         if (vm.timerSeconds > 0) {
-                            Text("${vm.timerSeconds}s", color = DC.Ember, fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("${vm.timerSeconds}s", color = DC.Ember, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -435,7 +436,7 @@ fun CameraScreen(
                             Text(
                                 "${z.toInt()}x",
                                 color = if (sel) DC.Bg else DC.Cream,
-                                fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp, fontWeight = FontWeight.Bold,
                                 modifier = Modifier
                                     .clip(CircleShape)
                                     .background(if (sel) DC.Cream else Color.Transparent)
@@ -455,7 +456,7 @@ fun CameraScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(100.dp),
+                .heightIn(min = 128.dp),
             contentAlignment = Alignment.Center,
         ) {
             when (vm.mode) {
@@ -482,7 +483,7 @@ fun CameraScreen(
                 ) {
                     Text(
                         m.label, color = if (sel) DC.Cream else DC.Muted,
-                        fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     )
                     Box(
                         Modifier
@@ -552,7 +553,7 @@ fun CameraScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 if (label != null) {
-                    Text(label, color = DC.Bg, fontFamily = Mono, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(label, color = DC.Bg, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
 

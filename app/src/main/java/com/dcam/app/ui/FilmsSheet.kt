@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -58,7 +59,7 @@ fun FilmsSheet(vm: DcamViewModel, onImportLut: () -> Unit, onDismiss: () -> Unit
                     Text("Previewed on what your camera sees right now", color = DC.Muted, fontSize = 13.sp)
                 }
                 Text(
-                    "+ IMPORT LUT", color = DC.Cream, fontFamily = Mono, fontSize = 11.sp,
+                    "Import LUT", color = DC.Cream, fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
@@ -91,30 +92,18 @@ fun FilmsSheet(vm: DcamViewModel, onImportLut: () -> Unit, onDismiss: () -> Unit
 
 @Composable
 private fun FilmCard(look: Look, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(22.dp)
-    Column(
-        Modifier
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(look.trim).copy(alpha = 0.22f), DC.Surface2)
-                )
-            )
-            .border(2.dp, if (selected) DC.Ember else Color.Transparent, shape)
-            .clickable(onClick = onClick)
-            .padding(14.dp),
+    val shape = RoundedCornerShape(20.dp)
+    Box(
+        Modifier.clip(shape).border(2.dp, if (selected) DC.Ember else Color.Transparent, shape).clickable(onClick = onClick),
     ) {
-        CameraArt(look, Modifier.fillMaxWidth())
-        Text(
-            look.name,
-            color = if (selected) DC.Ember else DC.Cream,
-            fontFamily = Mono, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-        Text(
-            look.desc.ifEmpty { "Imported LUT" },
-            color = DC.Muted, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+        CameraArt(look, Modifier.fillMaxWidth(), radius = 20.dp)
+        Column(
+            Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                .padding(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 10.dp),
+        ) {
+            Text(look.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 18.sp, maxLines = 2)
+            Text(look.desc.ifEmpty { "Imported LUT" }, color = Color(0xFFE6E0D6), fontSize = 12.sp, lineHeight = 15.sp, maxLines = 2)
+        }
     }
 }

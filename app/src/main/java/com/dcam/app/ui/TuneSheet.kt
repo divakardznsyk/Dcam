@@ -63,7 +63,7 @@ fun TuneSheet(vm: DcamViewModel, onDismiss: () -> Unit) {
                     )
                     Text(
                         String.format(Locale.US, "%+.1f", vm.exposureEv),
-                        color = DC.Cream, fontFamily = Mono, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                        color = DC.Cream, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(start = 12.dp),
                     )
                 }

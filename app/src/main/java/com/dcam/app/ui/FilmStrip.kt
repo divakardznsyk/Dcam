@@ -75,30 +75,19 @@ fun FilmStrip(vm: DcamViewModel, modifier: Modifier = Modifier, onOpenAll: (() -
 
 @Composable
 private fun StripCard(look: Look, selected: Boolean, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(86.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (selected) DC.Surface2 else DC.Surface)
-            .border(
-                1.5.dp,
-                if (selected) DC.Ember else Color.Transparent,
-                RoundedCornerShape(18.dp),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CameraArt(look, Modifier.fillMaxWidth())
+    Column(Modifier.width(92.dp).clickable(onClick = onClick), horizontalAlignment = Alignment.Start) {
+        CameraArt(
+            look,
+            Modifier.fillMaxWidth().border(2.dp, if (selected) DC.Ember else Color.Transparent, RoundedCornerShape(12.dp)),
+        )
         Text(
             look.name,
             color = if (selected) DC.Cream else DC.Muted,
-            fontFamily = Mono,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp),
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            lineHeight = 14.sp,
+            maxLines = 2,
+            modifier = Modifier.padding(top = 5.dp, start = 2.dp),
         )
     }
 }
