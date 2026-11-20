@@ -42,6 +42,24 @@ class CubeLut(val name: String, val size: Int, private val data: FloatArray) {
     }
 
     companion object {
+        /** Nothing presets ship the LUT as a 512x512 picture: 8x8 tiles of 64x64, red across, green down, blue by tile. */
+        fun fromHald(bmp: android.graphics.Bitmap, name: String): CubeLut {
+            val n = Math.round(Math.cbrt(bmp.width.toDouble())).toInt()
+            val s = n * n
+            require(bmp.width == s * n && bmp.height == s * n) { "Unsupported LUT image ${bmp.width}x${bmp.height}" }
+            val px = IntArray(bmp.width * bmp.height)
+            bmp.getPixels(px, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+            val d = FloatArray(s * s * s * 3)
+            var i = 0
+            for (b in 0 until s) for (g in 0 until s) for (r in 0 until s) {
+                val p = px[(b / n * s + g) * bmp.width + (b % n) * s + r]
+                d[i++] = ((p shr 16) and 255) / 255f
+                d[i++] = ((p shr 8) and 255) / 255f
+                d[i++] = (p and 255) / 255f
+            }
+            return CubeLut(name, s, d)
+        }
+
         private val WS = Regex("\\s+")
 
         fun parse(text: String, name: String): CubeLut {

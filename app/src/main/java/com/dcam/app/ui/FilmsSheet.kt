@@ -59,7 +59,7 @@ fun FilmsSheet(vm: DcamViewModel, onImportLut: () -> Unit, onDismiss: () -> Unit
                     Text("Previewed on what your camera sees right now", color = DC.Muted, fontSize = 13.sp)
                 }
                 Text(
-                    "Import LUT", color = DC.Cream, fontSize = 13.sp,
+                    "Import preset or LUT", color = DC.Cream, fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))

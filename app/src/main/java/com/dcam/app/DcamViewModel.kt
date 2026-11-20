@@ -298,6 +298,61 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------------------------------------------------------- LUTs
 
+    /** Picks the right importer: a Nothing preset .zip, or a .cube LUT. */
+    fun importFile(uri: Uri) {
+        val resolver = getApplication<Application>().contentResolver
+        var n = ""
+        resolver.query(uri, null, null, null, null)?.use { c ->
+            val col = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (col >= 0 && c.moveToFirst()) n = c.getString(col)
+        }
+        if (n.endsWith(".zip", true)) importNothingZip(uri) else importLut(uri)
+    }
+
+    /** Nothing Camera preset (zip with preset.json + lut_image.jpg). Saved so it survives restarts. */
+    private fun importNothingZip(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                var json: String? = null
+                var lutBytes: ByteArray? = null
+                getApplication<Application>().contentResolver.openInputStream(uri)?.use { raw ->
+                    java.util.zip.ZipInputStream(raw).use { z ->
+                        while (true) {
+                            val e = z.nextEntry ?: break
+                            when (e.name.substringAfterLast('/')) {
+                                "preset.json" -> json = z.readBytes().decodeToString()
+                                "lut_image.jpg", "lut_image.png" -> lutBytes = z.readBytes()
+                            }
+                        }
+                    }
+                }
+                val j = org.json.JSONObject(json ?: error("preset.json missing"))
+                val bytes = lutBytes ?: error("This preset has no LUT image")
+                val name = j.optString("PRT_NAME").trim().ifEmpty { j.optString("LUTN", "Nothing preset") }
+                val look = nothingLook(name, j, bytes)
+                lutDir().mkdirs()
+                val slug = name.replace(Regex("[^A-Za-z0-9]+"), "_")
+                File(lutDir(), "$slug.lut.jpg").writeBytes(bytes)
+                File(lutDir(), "$slug.json").writeText(j.toString())
+                looks.removeAll { it.id == look.id }
+                looks.add(look)
+                selectedLook = look
+                message = "Added preset $name"
+            } catch (e: Exception) {
+                message = "Could not import preset: ${e.message}"
+            }
+        }
+    }
+
+    private fun nothingLook(name: String, j: org.json.JSONObject, lutJpg: ByteArray): Look {
+        val bmp = android.graphics.BitmapFactory.decodeByteArray(lutJpg, 0, lutJpg.size, android.graphics.BitmapFactory.Options().apply { inScaled = false })
+            ?: error("Bad LUT image")
+        return Look(
+            id = "nothing:$name", name = name, desc = "Nothing preset, ${j.optString("LUTN")}",
+            grain = 0f, vignette = 0f, lut = CubeLut.fromHald(bmp, name),
+        )
+    }
+
     /** Imports a .cube LUT chosen by the user and adds it as a new film. */
     fun importLut(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -327,6 +382,13 @@ class DcamViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun loadSavedLuts() {
         viewModelScope.launch(Dispatchers.IO) {
+            lutDir().listFiles { f -> f.name.endsWith(".lut.jpg") }?.forEach { f ->
+                try {
+                    val slug = f.name.removeSuffix(".lut.jpg")
+                    val j = org.json.JSONObject(File(lutDir(), "$slug.json").readText())
+                    looks.add(nothingLook(j.optString("PRT_NAME").trim().ifEmpty { j.optString("LUTN") }, j, f.readBytes()))
+                } catch (_: Exception) { }
+            }
             lutDir().listFiles { f -> f.extension == "cube" }?.forEach { f ->
                 try {
                     looks.add(lutLook(CubeLut.parse(f.readText(), f.nameWithoutExtension)))

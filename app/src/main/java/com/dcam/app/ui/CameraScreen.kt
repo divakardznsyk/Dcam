@@ -127,7 +127,7 @@ fun CameraScreen(
 
     val lutPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) vm.importLut(uri) }
+    ) { uri -> if (uri != null) vm.importFile(uri) }
 
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
